@@ -9,6 +9,8 @@ class AppViewModel: ObservableObject {
     @Published var effortRecords: [EffortRecord] = []
     @Published var notifications: [Notification] = []
     @Published var chatMessages: [ChatMessage] = []
+    @Published var friendRequests: [FriendRequest] = []
+    @Published var friendGroups: [FriendGroup] = []
     @Published var currentRoom: Room?
     @Published var roomStartTime: Date?
     
@@ -20,6 +22,8 @@ class AppViewModel: ObservableObject {
         static let effortRecords = "savedEffortRecords"
         static let notifications = "savedNotifications"
         static let chatMessages = "savedChatMessages"
+        static let friendRequests = "savedFriendRequests"
+        static let friendGroups = "savedFriendGroups"
         static let currentUser = "savedCurrentUser"
     }
     
@@ -243,6 +247,101 @@ class AppViewModel: ObservableObject {
         saveData()
     }
     
+    // MARK: - 友達機能
+    func sendFriendRequest(to userId: UUID, message: String? = nil) -> Bool {
+        guard let currentUser = currentUser,
+              userId != currentUser.id,
+              !friendRequests.contains(where: { 
+                  $0.fromUserId == currentUser.id && $0.toUserId == userId && $0.status == .pending 
+              }) else { return false }
+        
+        let request = FriendRequest(fromUserId: currentUser.id, toUserId: userId, message: message)
+        friendRequests.append(request)
+        saveData()
+        return true
+    }
+    
+    func acceptFriendRequest(_ requestId: UUID) -> Bool {
+        guard var user = currentUser,
+              let requestIndex = friendRequests.firstIndex(where: { $0.id == requestId }),
+              friendRequests[requestIndex].toUserId == user.id else { return false }
+        
+        let request = friendRequests[requestIndex]
+        
+        // 友達リクエストを承認済みに変更
+        friendRequests[requestIndex].status = .accepted
+        
+        // お互いの友達リストに追加
+        if let userIndex = rooms.firstIndex(where: { $0.participants.contains { $0.id == request.fromUserId } }) {
+            // 友達リストに追加
+            if !user.friends.contains(request.fromUserId) {
+                user.friends.append(request.fromUserId)
+            }
+            
+            // 相手の友達リストにも追加（仮想的に）
+            // 実際のアプリでは、相手のデータも更新する必要があります
+        }
+        
+        // 現在のユーザーを更新
+        currentUser = user
+        
+        saveData()
+        return true
+    }
+    
+    func rejectFriendRequest(_ requestId: UUID) -> Bool {
+        guard let user = currentUser,
+              let requestIndex = friendRequests.firstIndex(where: { $0.id == requestId }),
+              friendRequests[requestIndex].toUserId == user.id else { return false }
+        
+        friendRequests[requestIndex].status = .rejected
+        saveData()
+        return true
+    }
+    
+    func removeFriend(_ friendId: UUID) -> Bool {
+        guard var user = currentUser else { return false }
+        
+        user.friends.removeAll { $0 == friendId }
+        
+        // 現在のユーザーを更新
+        currentUser = user
+        
+        saveData()
+        return true
+    }
+    
+    func createFriendGroup(name: String, description: String?, memberIds: [UUID]) -> Bool {
+        guard let currentUser = currentUser else { return false }
+        
+        let group = FriendGroup(name: name, description: description, createdBy: currentUser.id)
+        var newGroup = group
+        newGroup.members = [currentUser.id] + memberIds.filter { $0 != currentUser.id }
+        
+        friendGroups.append(newGroup)
+        saveData()
+        return true
+    }
+    
+    func getFriendsList() -> [User] {
+        guard let currentUser = currentUser else { return [] }
+        
+        // 現在のユーザーの友達IDからユーザーオブジェクトを取得
+        // 実際のアプリでは、ユーザーデータベースから取得する必要があります
+        return currentUser.friends.compactMap { friendId in
+            // 仮想的な実装 - 実際にはユーザーデータベースから取得
+            User(name: "友達\(friendId.uuidString.prefix(4))")
+        }
+    }
+    
+    func getPendingFriendRequests() -> [FriendRequest] {
+        guard let currentUser = currentUser else { return [] }
+        
+        return friendRequests.filter { 
+            $0.toUserId == currentUser.id && $0.status == .pending 
+        }
+    }
+    
     // MARK: - データ永続化
     private func saveData() {
         do {
@@ -261,6 +360,14 @@ class AppViewModel: ObservableObject {
             // チャットメッセージデータの保存
             let chatMessagesData = try JSONEncoder().encode(chatMessages)
             UserDefaults.standard.set(chatMessagesData, forKey: Keys.chatMessages)
+            
+            // 友達リクエストデータの保存
+            let friendRequestsData = try JSONEncoder().encode(friendRequests)
+            UserDefaults.standard.set(friendRequestsData, forKey: Keys.friendRequests)
+            
+            // 友達グループデータの保存
+            let friendGroupsData = try JSONEncoder().encode(friendGroups)
+            UserDefaults.standard.set(friendGroupsData, forKey: Keys.friendGroups)
             
             // 現在のユーザーデータの保存
             if let user = currentUser {
@@ -300,6 +407,18 @@ class AppViewModel: ObservableObject {
            let savedChatMessages = try? JSONDecoder().decode([ChatMessage].self, from: chatMessagesData) {
             chatMessages = savedChatMessages
             print("保存されたチャットメッセージを読み込みました: \(savedChatMessages.count)件")
+        }
+        
+        if let friendRequestsData = UserDefaults.standard.data(forKey: Keys.friendRequests),
+           let savedFriendRequests = try? JSONDecoder().decode([FriendRequest].self, from: friendRequestsData) {
+            friendRequests = savedFriendRequests
+            print("保存された友達リクエストを読み込みました: \(savedFriendRequests.count)件")
+        }
+        
+        if let friendGroupsData = UserDefaults.standard.data(forKey: Keys.friendGroups),
+           let savedFriendGroups = try? JSONDecoder().decode([FriendGroup].self, from: friendGroupsData) {
+            friendGroups = savedFriendGroups
+            print("保存された友達グループを読み込みました: \(savedFriendGroups.count)件")
         }
         
         if let userData = UserDefaults.standard.data(forKey: Keys.currentUser),

@@ -64,9 +64,71 @@ struct User: Identifiable, Codable {
     var currentRoom: Room?
     var joinTime: Date?
     
+    // 友達機能用のプロパティ
+    var friends: [UUID] // 友達のIDリスト
+    var friendRequests: [UUID] // 友達リクエストのIDリスト
+    var isOnline: Bool // オンライン状態
+    var lastSeen: Date // 最後のアクティビティ時間
+    
     init(name: String) {
         self.name = name
         self.profileImage = "person.circle.fill"
+        self.friends = []
+        self.friendRequests = []
+        self.isOnline = false
+        self.lastSeen = Date()
+    }
+}
+
+// MARK: - 友達リクエストモデル
+struct FriendRequest: Identifiable, Codable {
+    let id = UUID()
+    var fromUserId: UUID
+    var toUserId: UUID
+    var status: RequestStatus
+    var timestamp: Date
+    var message: String?
+    
+    enum RequestStatus: String, Codable, CaseIterable {
+        case pending = "pending"    // 待機中
+        case accepted = "accepted"  // 承認済み
+        case rejected = "rejected"  // 拒否済み
+        
+        var displayName: String {
+            switch self {
+            case .pending: return "待機中"
+            case .accepted: return "承認済み"
+            case .rejected: return "拒否済み"
+            }
+        }
+    }
+    
+    init(fromUserId: UUID, toUserId: UUID, message: String? = nil) {
+        self.fromUserId = fromUserId
+        self.toUserId = toUserId
+        self.status = .pending
+        self.timestamp = Date()
+        self.message = message
+    }
+}
+
+// MARK: - 友達グループモデル
+struct FriendGroup: Identifiable, Codable {
+    let id = UUID()
+    var name: String
+    var description: String?
+    var members: [UUID] // メンバーのIDリスト
+    var createdBy: UUID
+    var createdAt: Date
+    var isActive: Bool
+    
+    init(name: String, description: String? = nil, createdBy: UUID) {
+        self.name = name
+        self.description = description
+        self.members = [createdBy] // 作成者を最初のメンバーとして追加
+        self.createdBy = createdBy
+        self.createdAt = Date()
+        self.isActive = true
     }
 }
 

@@ -19,6 +19,13 @@ struct ContentView: View {
                     Text("部屋")
                 }
             
+            // 友達タブ
+            FriendsView(viewModel: viewModel)
+                .tabItem {
+                    Image(systemName: "person.2.fill")
+                    Text("友達")
+                }
+            
             // 統計タブ
             StatsView(viewModel: viewModel)
                 .tabItem {
