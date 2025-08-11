@@ -17,6 +17,11 @@ struct Room: Identifiable, Codable {
     var maxParticipants: Int
     var createdBy: UUID // 部屋作成者のID
     
+    // 部屋の状態管理
+    var isClosed: Bool // 部屋が閉鎖されているか
+    var closedAt: Date? // 閉鎖された日時
+    var closedBy: UUID? // 閉鎖したユーザーのID
+    
     init(name: String, tags: [String], createdBy: UUID, isPrivate: Bool = false, isInviteOnly: Bool = false, password: String? = nil, maxParticipants: Int = 10) {
         self.name = name
         self.tags = tags
@@ -28,10 +33,18 @@ struct Room: Identifiable, Codable {
         self.password = password
         self.maxParticipants = maxParticipants
         self.createdBy = createdBy
+        self.isClosed = false
+        self.closedAt = nil
+        self.closedBy = nil
     }
     
     // 部屋の参加可否をチェック
     func canJoin(userId: UUID, password: String? = nil) -> Bool {
+        // 部屋が閉鎖されている場合は参加不可
+        if isClosed {
+            return false
+        }
+        
         // 非公開部屋でパスワードが設定されている場合
         if isPrivate && self.password != nil {
             return self.password == password

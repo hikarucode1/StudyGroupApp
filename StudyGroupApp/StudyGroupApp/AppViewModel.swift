@@ -127,6 +127,51 @@ class AppViewModel: ObservableObject {
         return false
     }
     
+    // 部屋を閉鎖（作成者のみ）
+    func closeRoom(roomId: UUID) -> Bool {
+        guard let user = currentUser,
+              let roomIndex = rooms.firstIndex(where: { $0.id == roomId }),
+              rooms[roomIndex].isCreator(userId: user.id) else { return false }
+        
+        // 部屋を閉鎖状態にする
+        rooms[roomIndex].isClosed = true
+        rooms[roomIndex].closedAt = Date()
+        rooms[roomIndex].closedBy = user.id
+        
+        // 部屋の参加者全員を退出させる
+        let participants = rooms[roomIndex].participants
+        for participant in participants {
+            if participant.id != user.id { // 作成者以外
+                leaveRoom(roomId: roomId, userId: participant.id)
+            }
+        }
+        
+        // 作成者も部屋から退出
+        leaveRoom(roomId: roomId, userId: user.id)
+        
+        // システムメッセージを送信
+        sendSystemMessage(message: "部屋が作成者によって閉鎖されました", roomId: roomId)
+        
+        saveData()
+        return true
+    }
+    
+    // 部屋から特定のユーザーを退出させる（作成者のみ）
+    private func leaveRoom(roomId: UUID, userId: UUID) {
+        guard let roomIndex = rooms.firstIndex(where: { $0.id == roomId }) else { return }
+        
+        if let participantIndex = rooms[roomIndex].participants.firstIndex(where: { $0.id == userId }) {
+            let user = rooms[roomIndex].participants[participantIndex]
+            rooms[roomIndex].participants.remove(at: participantIndex)
+            
+            // 努力記録を終了
+            if let recordIndex = effortRecords.firstIndex(where: { $0.userId == userId && $0.roomId == roomId && $0.endTime == nil }) {
+                effortRecords[recordIndex].endTime = Date()
+                // durationは計算プロパティなので自動的に更新される
+            }
+        }
+    }
+    
     func leaveCurrentRoom() {
         guard let user = currentUser,
               let room = currentRoom,

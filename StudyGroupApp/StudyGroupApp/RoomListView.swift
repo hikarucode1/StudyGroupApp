@@ -39,7 +39,8 @@ struct RoomListView: View {
                         isCurrentRoom: viewModel.currentRoom?.id == room.id,
                         onJoin: {
                             viewModel.joinRoom(room)
-                        }
+                        },
+                        viewModel: viewModel
                     )
                 }
                 .searchable(text: $searchText, prompt: "部屋名やタグで検索")
@@ -195,12 +196,34 @@ struct RoomRowView: View {
     @State private var password = ""
     @State private var showingJoinError = false
     @State private var joinErrorMessage = ""
+    @State private var showingCloseRoomAlert = false
+    @ObservedObject var viewModel: AppViewModel
     
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
                 Text(room.name)
                     .font(.headline)
+                    .foregroundColor(room.isClosed ? .secondary : .primary)
+                
+                // 部屋が閉鎖されている場合の表示
+                if room.isClosed {
+                    HStack {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                        Text("閉鎖済み")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        
+                        if let closedAt = room.closedAt {
+                            Text("(\(closedAt, style: .relative))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
                 
                 // タグ表示
                 HStack {
@@ -213,14 +236,6 @@ struct RoomRowView: View {
                             .foregroundColor(.blue)
                             .cornerRadius(8)
                     }
-                }
-                
-                HStack {
-                    Image(systemName: "person.2")
-                        .foregroundColor(.secondary)
-                    Text("\(room.participants.count)人参加中")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                     
                     // プライベート設定の表示
                     if room.isPrivate {
@@ -235,7 +250,14 @@ struct RoomRowView: View {
                             .font(.caption)
                     }
                     
-                    Spacer()
+                    // 部屋の閉鎖状態表示
+                    if room.isClosed {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                    
+                    Spacer() // This Spacer was moved from the end of the HStack to allow icons to be next to tags
                     
                     Text(room.createdAt, style: .relative)
                         .font(.caption)
@@ -272,7 +294,21 @@ struct RoomRowView: View {
                             .background(Color.blue)
                             .clipShape(Circle())
                     }
-                } else {
+                    
+                    // 部屋作成者のみ閉鎖ボタンを表示
+                    if room.isCreator(userId: viewModel.currentUser?.id ?? UUID()) {
+                        Button(action: {
+                            showingCloseRoomAlert = true
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.red)
+                                .clipShape(Circle())
+                        }
+                    }
+                } else if !room.isClosed {
                     Button("参加") {
                         if room.isPrivate && room.password != nil {
                             showingPasswordAlert = true
@@ -281,6 +317,14 @@ struct RoomRowView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                } else {
+                    Text("閉鎖済み")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                 }
             }
         }
@@ -303,6 +347,14 @@ struct RoomRowView: View {
             Button("OK") { }
         } message: {
             Text(joinErrorMessage)
+        }
+        .alert("部屋を閉鎖", isPresented: $showingCloseRoomAlert) {
+            Button("閉鎖", role: .destructive) {
+                viewModel.closeRoom(roomId: room.id)
+            }
+            Button("キャンセル", role: .cancel) { }
+        } message: {
+            Text("この部屋を閉鎖しますか？\n\n閉鎖すると、すべての参加者が退出し、部屋に参加できなくなります。この操作は取り消せません。")
         }
     }
     
