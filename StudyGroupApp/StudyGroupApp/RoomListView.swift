@@ -98,23 +98,12 @@ struct CurrentRoomCard: View {
                 
                 Spacer()
                 
-                Text("参加者: \(room.participants.count)人")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            // タグ表示
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    ForEach(room.tags, id: \.self) { tag in
-                        Text("#\(tag)")
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
-                            .cornerRadius(12)
-                    }
+                // 参加者アイコン表示
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("参加者")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    ParticipantsIconRow(participants: room.participants)
                 }
             }
         }
@@ -149,6 +138,49 @@ struct CurrentRoomCard: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+}
+
+// MARK: - 参加者アイコン行
+struct ParticipantsIconRow: View {
+    let participants: [User]
+    
+    var body: some View {
+        HStack(spacing: -8) {
+            ForEach(Array(participants.prefix(5).enumerated()), id: \.element.id) { index, participant in
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: participant.profileImage ?? "person.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.blue)
+                }
+                .overlay(
+                    Circle()
+                        .stroke(Color.white, lineWidth: 2)
+                )
+                .zIndex(Double(participants.count - index))
+            }
+            
+            if participants.count > 5 {
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                    
+                    Text("+\(participants.count - 5)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.gray)
+                }
+                .overlay(
+                    Circle()
+                        .stroke(Color.white, lineWidth: 2)
+                )
+            }
         }
     }
 }
@@ -190,6 +222,12 @@ struct RoomRowView: View {
                     Text(room.createdAt, style: .relative)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+                
+                // 参加者アイコン表示
+                if !room.participants.isEmpty {
+                    ParticipantsIconRow(participants: room.participants)
+                        .padding(.top, 4)
                 }
             }
             
