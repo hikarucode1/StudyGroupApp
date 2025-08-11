@@ -8,6 +8,7 @@ class AppViewModel: ObservableObject {
     @Published var rooms: [Room] = []
     @Published var effortRecords: [EffortRecord] = []
     @Published var notifications: [Notification] = []
+    @Published var chatMessages: [ChatMessage] = []
     @Published var currentRoom: Room?
     @Published var roomStartTime: Date?
     
@@ -18,6 +19,7 @@ class AppViewModel: ObservableObject {
         static let rooms = "savedRooms"
         static let effortRecords = "savedEffortRecords"
         static let notifications = "savedNotifications"
+        static let chatMessages = "savedChatMessages"
         static let currentUser = "savedCurrentUser"
     }
     
@@ -52,6 +54,9 @@ class AppViewModel: ObservableObject {
         let record = EffortRecord(userId: user.id, roomId: room.id, tags: room.tags)
         effortRecords.append(record)
         
+        // システムメッセージを送信
+        sendSystemMessage(message: "\(user.name)さんが部屋に参加しました", roomId: room.id)
+        
         // タイマー開始
         startTimer()
         
@@ -74,6 +79,9 @@ class AppViewModel: ObservableObject {
         if let roomIndex = rooms.firstIndex(where: { $0.id == room.id }) {
             rooms[roomIndex].participants.removeAll { $0.id == user.id }
         }
+        
+        // システムメッセージを送信
+        sendSystemMessage(message: "\(user.name)さんが部屋から退出しました", roomId: room.id)
         
         currentRoom = nil
         roomStartTime = nil
@@ -134,6 +142,47 @@ class AppViewModel: ObservableObject {
         UNUserNotificationCenter.current().add(request)
     }
     
+    // MARK: - チャット機能
+    func sendChatMessage(message: String, roomId: UUID) {
+        guard let user = currentUser else { return }
+        
+        let chatMessage = ChatMessage(
+            userId: user.id,
+            roomId: roomId,
+            userName: user.name,
+            userProfileImage: user.profileImage,
+            message: message
+        )
+        
+        chatMessages.append(chatMessage)
+        saveData()
+    }
+    
+    func sendSystemMessage(message: String, roomId: UUID) {
+        let systemMessage = ChatMessage(
+            userId: UUID(), // システムメッセージ用の特別なID
+            roomId: roomId,
+            userName: "システム",
+            userProfileImage: "info.circle.fill",
+            message: message,
+            messageType: .system
+        )
+        
+        chatMessages.append(systemMessage)
+        saveData()
+    }
+    
+    func getChatMessages(for roomId: UUID) -> [ChatMessage] {
+        return chatMessages
+            .filter { $0.roomId == roomId }
+            .sorted { $0.timestamp < $1.timestamp }
+    }
+    
+    func clearChatMessages(for roomId: UUID) {
+        chatMessages.removeAll { $0.roomId == roomId }
+        saveData()
+    }
+    
     // MARK: - データ永続化
     private func saveData() {
         do {
@@ -148,6 +197,10 @@ class AppViewModel: ObservableObject {
             // 通知データの保存
             let notificationsData = try JSONEncoder().encode(notifications)
             UserDefaults.standard.set(notificationsData, forKey: Keys.notifications)
+            
+            // チャットメッセージデータの保存
+            let chatMessagesData = try JSONEncoder().encode(chatMessages)
+            UserDefaults.standard.set(chatMessagesData, forKey: Keys.chatMessages)
             
             // 現在のユーザーデータの保存
             if let user = currentUser {
@@ -181,6 +234,12 @@ class AppViewModel: ObservableObject {
            let savedNotifications = try? JSONDecoder().decode([Notification].self, from: notificationsData) {
             notifications = savedNotifications
             print("保存された通知を読み込みました: \(savedNotifications.count)件")
+        }
+        
+        if let chatMessagesData = UserDefaults.standard.data(forKey: Keys.chatMessages),
+           let savedChatMessages = try? JSONDecoder().decode([ChatMessage].self, from: chatMessagesData) {
+            chatMessages = savedChatMessages
+            print("保存されたチャットメッセージを読み込みました: \(savedChatMessages.count)件")
         }
         
         if let userData = UserDefaults.standard.data(forKey: Keys.currentUser),

@@ -69,6 +69,42 @@ struct Notification: Identifiable, Codable {
     }
 }
 
+// MARK: - チャットメッセージモデル
+struct ChatMessage: Identifiable, Codable {
+    let id = UUID()
+    var userId: UUID
+    var roomId: UUID
+    var userName: String
+    var userProfileImage: String?
+    var message: String
+    var timestamp: Date
+    var messageType: MessageType
+    
+    enum MessageType: String, Codable, CaseIterable {
+        case text = "text"
+        case system = "system"      // システムメッセージ（入室・退室など）
+        case reaction = "reaction"  // リアクション
+        
+        var displayName: String {
+            switch self {
+            case .text: return "テキスト"
+            case .system: return "システム"
+            case .reaction: return "リアクション"
+            }
+        }
+    }
+    
+    init(userId: UUID, roomId: UUID, userName: String, userProfileImage: String? = nil, message: String, messageType: MessageType = .text) {
+        self.userId = userId
+        self.roomId = roomId
+        self.userName = userName
+        self.userProfileImage = userProfileImage
+        self.message = message
+        self.timestamp = Date()
+        self.messageType = messageType
+    }
+}
+
 // MARK: - 統計データ構造
 struct EffortStats {
     let totalDuration: TimeInterval

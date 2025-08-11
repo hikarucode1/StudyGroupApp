@@ -190,6 +190,7 @@ struct RoomRowView: View {
     let room: Room
     let isCurrentRoom: Bool
     let onJoin: () -> Void
+    @State private var showingChat = false
     
     var body: some View {
         HStack {
@@ -233,22 +234,41 @@ struct RoomRowView: View {
             
             Spacer()
             
-            if isCurrentRoom {
-                Text("参加中")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-            } else {
-                Button("参加") {
-                    onJoin()
+            VStack(spacing: 8) {
+                if isCurrentRoom {
+                    Text("参加中")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    
+                    // チャットボタン
+                    Button(action: {
+                        showingChat = true
+                    }) {
+                        Image(systemName: "message.fill")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                    }
+                } else {
+                    Button("参加") {
+                        onJoin()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
         .padding(.vertical, 4)
+        .sheet(isPresented: $showingChat) {
+            NavigationView {
+                ChatView(viewModel: AppViewModel(), room: room)
+            }
+        }
     }
 }
 
