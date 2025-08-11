@@ -8,6 +8,12 @@ struct CreateRoomView: View {
     @State private var newTag = ""
     @State private var tags: [String] = []
     
+    // プライベート設定
+    @State private var isPrivate = false
+    @State private var isInviteOnly = false
+    @State private var password = ""
+    @State private var maxParticipants = 10
+    
     var body: some View {
         NavigationView {
             Form {
@@ -49,6 +55,48 @@ struct CreateRoomView: View {
                                 }
                             }
                         }
+                    }
+                }
+                
+                Section("プライベート設定") {
+                    Toggle("非公開部屋", isOn: $isPrivate)
+                        .onChange(of: isPrivate) { newValue in
+                            if !newValue {
+                                password = ""
+                            }
+                        }
+                    
+                    if isPrivate {
+                        SecureField("パスワード", text: $password)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        
+                        Text("パスワードを知っている人のみが参加できます")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Toggle("招待制", isOn: $isInviteOnly)
+                        .onChange(of: isInviteOnly) { newValue in
+                            if newValue {
+                                isPrivate = true
+                            }
+                        }
+                    
+                    if isInviteOnly {
+                        Text("部屋作成者のみが参加者を追加できます")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("最大参加者数")
+                        Spacer()
+                        Picker("最大参加者数", selection: $maxParticipants) {
+                            ForEach([5, 10, 15, 20, 30, 50], id: \.self) { number in
+                                Text("\(number)人").tag(number)
+                            }
+                        }
+                        .pickerStyle(MenuPickerStyle())
                     }
                 }
                 
@@ -105,7 +153,15 @@ struct CreateRoomView: View {
     }
     
     private func createRoom() {
-        viewModel.createRoom(name: roomName, tags: tags)
+        let finalPassword = isPrivate && !password.isEmpty ? password : nil
+        viewModel.createRoom(
+            name: roomName,
+            tags: tags,
+            isPrivate: isPrivate,
+            isInviteOnly: isInviteOnly,
+            password: finalPassword,
+            maxParticipants: maxParticipants
+        )
         dismiss()
     }
     

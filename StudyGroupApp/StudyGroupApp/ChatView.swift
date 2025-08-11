@@ -281,5 +281,5 @@ struct EmojiPickerView: View {
 }
 
 #Preview {
-    ChatView(viewModel: AppViewModel(), room: Room(name: "テスト部屋", tags: ["テスト"]))
+    ChatView(viewModel: AppViewModel(), room: Room(name: "テスト部屋", tags: ["テスト"], createdBy: UUID()))
 } 

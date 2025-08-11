@@ -10,12 +10,49 @@ struct Room: Identifiable, Codable {
     var participants: [User]
     var isActive: Bool
     
-    init(name: String, tags: [String]) {
+    // プライベート設定
+    var isPrivate: Bool
+    var isInviteOnly: Bool
+    var password: String?
+    var maxParticipants: Int
+    var createdBy: UUID // 部屋作成者のID
+    
+    init(name: String, tags: [String], createdBy: UUID, isPrivate: Bool = false, isInviteOnly: Bool = false, password: String? = nil, maxParticipants: Int = 10) {
         self.name = name
         self.tags = tags
         self.createdAt = Date()
         self.participants = []
         self.isActive = true
+        self.isPrivate = isPrivate
+        self.isInviteOnly = isInviteOnly
+        self.password = password
+        self.maxParticipants = maxParticipants
+        self.createdBy = createdBy
+    }
+    
+    // 部屋の参加可否をチェック
+    func canJoin(userId: UUID, password: String? = nil) -> Bool {
+        // 非公開部屋でパスワードが設定されている場合
+        if isPrivate && self.password != nil {
+            return self.password == password
+        }
+        
+        // 招待制の場合、作成者または既存参加者のみ
+        if isInviteOnly {
+            return createdBy == userId || participants.contains { $0.id == userId }
+        }
+        
+        // 参加者数制限チェック
+        if participants.count >= maxParticipants {
+            return false
+        }
+        
+        return true
+    }
+    
+    // 部屋作成者かどうかチェック
+    func isCreator(userId: UUID) -> Bool {
+        return createdBy == userId
     }
 }
 

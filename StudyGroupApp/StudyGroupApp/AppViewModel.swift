@@ -29,14 +29,33 @@ class AppViewModel: ObservableObject {
     }
     
     // MARK: - 部屋管理
-    func createRoom(name: String, tags: [String]) {
-        let newRoom = Room(name: name, tags: tags)
+    func createRoom(name: String, tags: [String], isPrivate: Bool = false, isInviteOnly: Bool = false, password: String? = nil, maxParticipants: Int = 10) {
+        guard let user = currentUser else { return }
+        
+        var newRoom = Room(
+            name: name,
+            tags: tags,
+            createdBy: user.id,
+            isPrivate: isPrivate,
+            isInviteOnly: isInviteOnly,
+            password: password,
+            maxParticipants: maxParticipants
+        )
+        
+        // 作成者を最初の参加者として追加
+        newRoom.participants.append(user)
+        
         rooms.append(newRoom)
         saveData()
     }
     
-    func joinRoom(_ room: Room) {
-        guard let user = currentUser else { return }
+    func joinRoom(_ room: Room, password: String? = nil) -> Bool {
+        guard let user = currentUser else { return false }
+        
+        // 部屋の参加可否をチェック
+        if !room.canJoin(userId: user.id, password: password) {
+            return false
+        }
         
         // 現在の部屋から退出
         leaveCurrentRoom()
@@ -61,6 +80,47 @@ class AppViewModel: ObservableObject {
         startTimer()
         
         saveData()
+        return true
+    }
+    
+    // 部屋の設定を更新
+    func updateRoomSettings(roomId: UUID, isPrivate: Bool, isInviteOnly: Bool, password: String?, maxParticipants: Int) -> Bool {
+        guard let user = currentUser,
+              let roomIndex = rooms.firstIndex(where: { $0.id == roomId }),
+              rooms[roomIndex].isCreator(userId: user.id) else { return false }
+        
+        rooms[roomIndex].isPrivate = isPrivate
+        rooms[roomIndex].isInviteOnly = isInviteOnly
+        rooms[roomIndex].password = password
+        rooms[roomIndex].maxParticipants = maxParticipants
+        
+        saveData()
+        return true
+    }
+    
+    // 部屋からユーザーを削除（作成者のみ）
+    func removeUserFromRoom(roomId: UUID, userId: UUID) -> Bool {
+        guard let user = currentUser,
+              let roomIndex = rooms.firstIndex(where: { $0.id == roomId }),
+              rooms[roomIndex].isCreator(userId: user.id) else { return false }
+        
+        // 自分自身は削除できない
+        if userId == user.id {
+            return false
+        }
+        
+        if let participantIndex = rooms[roomIndex].participants.firstIndex(where: { $0.id == userId }) {
+            let removedUser = rooms[roomIndex].participants[participantIndex]
+            rooms[roomIndex].participants.remove(at: participantIndex)
+            
+            // システムメッセージを送信
+            sendSystemMessage(message: "\(removedUser.name)さんが部屋から削除されました", roomId: roomId)
+            
+            saveData()
+            return true
+        }
+        
+        return false
     }
     
     func leaveCurrentRoom() {
@@ -252,11 +312,13 @@ class AppViewModel: ObservableObject {
     }
     
     private func loadSampleRooms() {
+        guard let user = currentUser else { return }
+        
         // サンプル部屋を作成
         rooms = [
-            Room(name: "朝活勉強", tags: ["勉強", "朝活"]),
-            Room(name: "夜の筋トレ", tags: ["筋トレ", "健康"]),
-            Room(name: "資格勉強", tags: ["勉強", "資格"])
+            Room(name: "朝活勉強", tags: ["勉強", "朝活"], createdBy: user.id, isPrivate: false, isInviteOnly: false),
+            Room(name: "夜の筋トレ", tags: ["筋トレ", "健康"], createdBy: user.id, isPrivate: false, isInviteOnly: false),
+            Room(name: "資格勉強", tags: ["勉強", "資格"], createdBy: user.id, isPrivate: true, isInviteOnly: true, password: "1234", maxParticipants: 5)
         ]
         print("サンプル部屋データを作成しました")
     }

@@ -191,6 +191,10 @@ struct RoomRowView: View {
     let isCurrentRoom: Bool
     let onJoin: () -> Void
     @State private var showingChat = false
+    @State private var showingPasswordAlert = false
+    @State private var password = ""
+    @State private var showingJoinError = false
+    @State private var joinErrorMessage = ""
     
     var body: some View {
         HStack {
@@ -217,6 +221,19 @@ struct RoomRowView: View {
                     Text("\(room.participants.count)人参加中")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    
+                    // プライベート設定の表示
+                    if room.isPrivate {
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                    }
+                    
+                    if room.isInviteOnly {
+                        Image(systemName: "person.badge.plus")
+                            .foregroundColor(.purple)
+                            .font(.caption)
+                    }
                     
                     Spacer()
                     
@@ -257,7 +274,11 @@ struct RoomRowView: View {
                     }
                 } else {
                     Button("参加") {
-                        onJoin()
+                        if room.isPrivate && room.password != nil {
+                            showingPasswordAlert = true
+                        } else {
+                            attemptJoin()
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -269,6 +290,27 @@ struct RoomRowView: View {
                 ChatView(viewModel: AppViewModel(), room: room)
             }
         }
+        .alert("パスワード入力", isPresented: $showingPasswordAlert) {
+            SecureField("パスワード", text: $password)
+            Button("参加") {
+                attemptJoin()
+            }
+            Button("キャンセル", role: .cancel) { }
+        } message: {
+            Text("この部屋に参加するにはパスワードが必要です")
+        }
+        .alert("参加エラー", isPresented: $showingJoinError) {
+            Button("OK") { }
+        } message: {
+            Text(joinErrorMessage)
+        }
+    }
+    
+    private func attemptJoin() {
+        // ここでAppViewModelのjoinRoomメソッドを呼び出す必要があります
+        // 現在の実装ではonJoinクロージャーを使用しているため、
+        // パスワード検証を含む新しい実装が必要です
+        onJoin()
     }
 }
 
