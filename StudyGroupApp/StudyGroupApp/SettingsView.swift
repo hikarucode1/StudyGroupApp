@@ -11,6 +11,9 @@ struct SettingsView: View {
     // 制限アラート管理
     @State private var showingPremiumPurchase = false
     @State private var showingProfileEdit = false
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTermsOfService = false
+    @State private var showingContact = false
     
     var body: some View {
         NavigationView {
@@ -44,6 +47,15 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingProfileEdit) {
                 UserProfileEditView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showingPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
+            .sheet(isPresented: $showingTermsOfService) {
+                TermsOfServiceView()
+            }
+            .sheet(isPresented: $showingContact) {
+                ContactView()
             }
         }
     }
@@ -207,7 +219,7 @@ struct SettingsView: View {
             
             Section {
                 Button(action: {
-                    // プライバシーポリシーを表示
+                    showingPrivacyPolicy = true
                 }) {
                     HStack {
                         Image(systemName: "hand.raised")
@@ -217,7 +229,7 @@ struct SettingsView: View {
                 }
                 
                 Button(action: {
-                    // 利用規約を表示
+                    showingTermsOfService = true
                 }) {
                     HStack {
                         Image(systemName: "doc.text")
@@ -227,7 +239,7 @@ struct SettingsView: View {
                 }
                 
                 Button(action: {
-                    // お問い合わせ
+                    showingContact = true
                 }) {
                     HStack {
                         Image(systemName: "envelope")
