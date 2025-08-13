@@ -1,18 +1,60 @@
 import SwiftUI
 
+// MARK: - 共通関数
+private func getCreatorName(for room: Room, currentUserId: UUID?) -> String {
+    // 参加者の中から作成者を探す
+    if let creator = room.participants.first(where: { $0.id == room.createdBy }) {
+        return creator.name
+    }
+    
+    // 参加者の中に見つからない場合は、作成者IDの一部を表示
+    return "ユーザー\(room.createdBy.uuidString.prefix(4))"
+}
+
 struct RoomListView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var showingCreateRoom = false
     @State private var searchText = ""
+    @State private var showArchivedRooms = false
+    @State private var archiveFilter: ArchiveFilter = .myRooms
+    
+    enum ArchiveFilter: String, CaseIterable {
+        case myRooms = "myRooms"
+        case allRooms = "allRooms"
+        
+        var displayName: String {
+            switch self {
+            case .myRooms: return "自分の部屋のみ"
+            case .allRooms: return "全ての部屋"
+            }
+        }
+    }
     
     var filteredRooms: [Room] {
+        let activeRooms = viewModel.rooms.filter { !$0.isClosed }
+        
         if searchText.isEmpty {
-            return viewModel.rooms
+            return activeRooms
         } else {
-            return viewModel.rooms.filter { room in
+            return activeRooms.filter { room in
                 room.name.localizedCaseInsensitiveContains(searchText) ||
                 room.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
             }
+        }
+    }
+    
+    var archivedRooms: [Room] {
+        let closedRooms = viewModel.rooms.filter { $0.isClosed }
+        
+        switch archiveFilter {
+        case .myRooms:
+            // 自分が作成した部屋のみ
+            return closedRooms.filter { room in
+                room.createdBy == viewModel.currentUser?.id
+            }
+        case .allRooms:
+            // 全ての閉鎖済み部屋
+            return closedRooms
         }
     }
     
@@ -25,6 +67,7 @@ struct RoomListView: View {
                     CurrentRoomCard(
                         room: currentRoom,
                         startTime: startTime,
+                        viewModel: viewModel,
                         onLeave: {
                             viewModel.leaveCurrentRoom()
                         }
@@ -32,16 +75,75 @@ struct RoomListView: View {
                     .padding()
                 }
                 
+                // アーカイブ表示の切り替え
+                if !archivedRooms.isEmpty {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Button(action: {
+                                showArchivedRooms.toggle()
+                            }) {
+                                HStack {
+                                    Image(systemName: showArchivedRooms ? "archivebox.fill" : "archivebox")
+                                    Text(showArchivedRooms ? "アーカイブを隠す" : "アーカイブを表示")
+                                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("\(archivedRooms.count)件の閉鎖済み部屋")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // アーカイブフィルター
+                        if showArchivedRooms {
+                            HStack {
+                                Text("表示範囲:")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                Picker("アーカイブフィルター", selection: $archiveFilter) {
+                                    ForEach(ArchiveFilter.allCases, id: \.self) { filter in
+                                        Text(filter.displayName).tag(filter)
+                                    }
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+                                .scaleEffect(0.8)
+                                
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                }
+                
                 // 部屋一覧
-                List(filteredRooms) { room in
-                    RoomRowView(
-                        room: room,
-                        isCurrentRoom: viewModel.currentRoom?.id == room.id,
-                        onJoin: {
-                            viewModel.joinRoom(room)
-                        },
-                        viewModel: viewModel
-                    )
+                List {
+                    // アクティブな部屋
+                    Section("アクティブな部屋 (\(filteredRooms.count)件)") {
+                        ForEach(filteredRooms) { room in
+                            RoomRowView(
+                                room: room,
+                                isCurrentRoom: viewModel.currentRoom?.id == room.id,
+                                onJoin: {
+                                    viewModel.joinRoom(room)
+                                },
+                                viewModel: viewModel
+                            )
+                        }
+                    }
+                    
+                    // アーカイブされた部屋（表示する場合）
+                    if showArchivedRooms && !archivedRooms.isEmpty {
+                        Section("アーカイブ (\(archivedRooms.count)件) - \(archiveFilter.displayName)") {
+                            ForEach(archivedRooms) { room in
+                                ArchivedRoomRowView(room: room, isMyRoom: room.createdBy == viewModel.currentUser?.id)
+                            }
+                        }
+                    }
                 }
                 .searchable(text: $searchText, prompt: "部屋名やタグで検索")
             }
@@ -66,6 +168,7 @@ struct RoomListView: View {
 struct CurrentRoomCard: View {
     let room: Room
     let startTime: Date
+    let viewModel: AppViewModel
     let onLeave: () -> Void
     
     @State private var elapsedTime: TimeInterval = 0
@@ -81,6 +184,23 @@ struct CurrentRoomCard: View {
                     Text(room.name)
                         .font(.title2)
                         .fontWeight(.bold)
+                    
+                    // 作成者情報の表示
+                    HStack {
+                        Image(systemName: "person.circle")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        
+                        if room.isCreator(userId: viewModel.currentUser?.id ?? UUID()) {
+                            Text("作成者: あなた")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("作成者: \(getCreatorName(for: room, currentUserId: viewModel.currentUser?.id))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -257,11 +377,30 @@ struct RoomRowView: View {
                             .font(.caption)
                     }
                     
-                    Spacer() // This Spacer was moved from the end of the HStack to allow icons to be next to tags
+                    Spacer()
                     
                     Text(room.createdAt, style: .relative)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+                
+                // 作成者情報の表示
+                HStack {
+                    Image(systemName: "person.circle")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    
+                    if room.isCreator(userId: viewModel.currentUser?.id ?? UUID()) {
+                        Text("作成者: あなた")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    } else {
+                        Text("作成者: \(getCreatorName(for: room, currentUserId: viewModel.currentUser?.id))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
                 }
                 
                 // 参加者アイコン表示
@@ -363,6 +502,109 @@ struct RoomRowView: View {
         // 現在の実装ではonJoinクロージャーを使用しているため、
         // パスワード検証を含む新しい実装が必要です
         onJoin()
+    }
+}
+
+// MARK: - アーカイブ部屋行ビュー
+struct ArchivedRoomRowView: View {
+    let room: Room
+    let isMyRoom: Bool
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(room.name)
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .strikethrough()
+                    
+                    if isMyRoom {
+                        Text("(作成者)")
+                            .font(.caption2)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.2))
+                            .foregroundColor(.blue)
+                            .cornerRadius(4)
+                    }
+                }
+                
+                // 閉鎖情報の表示
+                HStack {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                    Text("閉鎖済み")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    
+                    if let closedAt = room.closedAt {
+                        Text("(\(closedAt, style: .relative))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+                
+                // タグ表示
+                HStack {
+                    ForEach(room.tags, id: \.self) { tag in
+                        Text("#\(tag)")
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray.opacity(0.1))
+                            .foregroundColor(.gray)
+                            .cornerRadius(8)
+                    }
+                    
+                    // プライベート設定の表示
+                    if room.isPrivate {
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                    }
+                    
+                    if room.isInviteOnly {
+                        Image(systemName: "person.badge.plus")
+                            .foregroundColor(.purple)
+                            .font(.caption)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(room.createdAt, style: .relative)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // 参加者情報
+                HStack {
+                    Image(systemName: "person.2")
+                        .foregroundColor(.secondary)
+                    Text("\(room.participants.count)人参加していた")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                }
+            }
+            
+            Spacer()
+            
+            VStack(spacing: 8) {
+                Text("アーカイブ")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(isMyRoom ? Color.blue : Color.gray)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(.vertical, 4)
+        .opacity(isMyRoom ? 0.8 : 0.6)
     }
 }
 

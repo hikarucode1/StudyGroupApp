@@ -7,6 +7,8 @@ struct CreateRoomView: View {
     @State private var roomName = ""
     @State private var newTag = ""
     @State private var tags: [String] = []
+    @State private var showingTagSuggestions = false
+    @State private var filteredTags: [String] = []
     
     // プライベート設定
     @State private var isPrivate = false
@@ -22,39 +24,123 @@ struct CreateRoomView: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 
-                Section("タグ") {
-                    HStack {
-                        TextField("新しいタグ", text: $newTag)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                Section("タグ設定") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // タグの説明
+                        Text("部屋の目的や内容を表すタグを設定してください")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 4)
                         
-                        Button("追加") {
-                            addTag()
+                        // タグ入力欄
+                        HStack {
+                            TextField("例: 勉強, 朝活, 資格", text: $newTag)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onChange(of: newTag) { newValue in
+                                    filterTags(for: newValue)
+                                    showingTagSuggestions = !newValue.isEmpty
+                                }
+                            
+                            Button("追加") {
+                                addTag()
+                            }
+                            .disabled(newTag.isEmpty)
+                            .buttonStyle(.borderedProminent)
                         }
-                        .disabled(newTag.isEmpty)
+                        
+                        // タグ入力のヒント
+                        Text("💡 ヒント: 「勉強」「朝活」「資格」など、部屋の目的を表す言葉を入力してください")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(6)
                     }
                     
-                    if !tags.isEmpty {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                            ForEach(tags, id: \.self) { tag in
-                                HStack {
-                                    Text("#\(tag)")
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundColor(.blue)
-                                        .cornerRadius(12)
-                                    
+                    // タグ候補の表示
+                    if showingTagSuggestions && !filteredTags.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("タグ候補:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 6) {
+                                ForEach(filteredTags, id: \.self) { tag in
                                     Button(action: {
-                                        removeTag(tag)
+                                        if !tags.contains(tag) {
+                                            tags.append(tag)
+                                            newTag = ""
+                                            showingTagSuggestions = false
+                                        }
                                     }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.red)
+                                        Text("#\(tag)")
                                             .font(.caption)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(Color.green.opacity(0.2))
+                                            .foregroundColor(.green)
+                                            .cornerRadius(8)
+                                    }
+                                    .disabled(tags.contains(tag))
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    
+                    // 設定されたタグの表示
+                    if !tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("設定されたタグ (\(tags.count)個)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button("全て削除") {
+                                    tags.removeAll()
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                            }
+                            
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                                ForEach(tags, id: \.self) { tag in
+                                    HStack {
+                                        Text("#\(tag)")
+                                            .font(.caption)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.blue.opacity(0.1))
+                                            .foregroundColor(.blue)
+                                            .cornerRadius(12)
+                                        
+                                        Button(action: {
+                                            removeTag(tag)
+                                        }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundColor(.red)
+                                                .font(.caption)
+                                        }
                                     }
                                 }
                             }
                         }
+                    } else {
+                        // タグが設定されていない場合の案内
+                        HStack {
+                            Image(systemName: "tag")
+                                .foregroundColor(.secondary)
+                            Text("タグが設定されていません")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
                     }
                 }
                 
@@ -99,27 +185,6 @@ struct CreateRoomView: View {
                         .pickerStyle(MenuPickerStyle())
                     }
                 }
-                
-                Section("推奨タグ") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                        ForEach(suggestedTags, id: \.self) { tag in
-                            Button(action: {
-                                if !tags.contains(tag) {
-                                    tags.append(tag)
-                                }
-                            }) {
-                                Text("#\(tag)")
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.gray.opacity(0.1))
-                                    .foregroundColor(.gray)
-                                    .cornerRadius(12)
-                            }
-                            .disabled(tags.contains(tag))
-                        }
-                    }
-                }
             }
             .navigationTitle("新しい部屋を作成")
             .navigationBarTitleDisplayMode(.inline)
@@ -145,11 +210,24 @@ struct CreateRoomView: View {
         if !trimmedTag.isEmpty && !tags.contains(trimmedTag) {
             tags.append(trimmedTag)
             newTag = ""
+            showingTagSuggestions = false
         }
     }
     
     private func removeTag(_ tag: String) {
         tags.removeAll { $0 == tag }
+    }
+    
+    private func filterTags(for input: String) {
+        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedInput.isEmpty {
+            filteredTags = []
+        } else {
+            // 入力文字列を含むタグを検索（部分一致）
+            filteredTags = commonTags.filter { tag in
+                tag.localizedCaseInsensitiveContains(trimmedInput)
+            }
+        }
     }
     
     private func createRoom() {
@@ -165,11 +243,26 @@ struct CreateRoomView: View {
         dismiss()
     }
     
-    private var suggestedTags: [String] {
+    // よく使われるタグの候補（予測変換用）
+    private var commonTags: [String] {
         [
-            "勉強", "筋トレ", "仕事", "アルバイト", "朝活", "夜活",
-            "資格", "語学", "健康", "ダイエット", "読書", "プログラミング",
-            "音楽", "アート", "料理", "掃除", "整理整頓"
+            // 学習・勉強系
+            "勉強", "資格", "語学", "プログラミング", "読書", "論文", "研究", "試験", "テスト", "レポート",
+            
+            // 運動・健康系
+            "筋トレ", "運動", "ランニング", "ウォーキング", "ヨガ", "ストレッチ", "ダイエット", "健康", "睡眠", "食事",
+            
+            // 仕事・活動系
+            "仕事", "アルバイト", "副業", "起業", "営業", "企画", "デザイン", "マーケティング", "会計", "法務",
+            
+            // 時間帯・習慣系
+            "朝活", "夜活", "早起き", "夜更かし", "習慣", "継続", "計画", "目標", "振り返り", "記録",
+            
+            // 趣味・生活系
+            "音楽", "アート", "料理", "掃除", "整理整頓", "DIY", "ガーデニング", "写真", "動画", "ゲーム",
+            
+            // メンタル・精神系
+            "瞑想", "日記", "感謝", "ポジティブ", "ストレス解消", "リラックス", "集中", "モチベーション", "自己啓発", "マインドフルネス"
         ]
     }
 }

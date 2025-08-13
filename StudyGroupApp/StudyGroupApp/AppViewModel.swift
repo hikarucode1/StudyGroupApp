@@ -50,6 +50,21 @@ class AppViewModel: ObservableObject {
         newRoom.participants.append(user)
         
         rooms.append(newRoom)
+        
+        // 作成者を自動的に部屋に参加させる
+        currentRoom = newRoom
+        roomStartTime = Date()
+        
+        // 努力記録を作成
+        let record = EffortRecord(userId: user.id, roomId: newRoom.id, tags: newRoom.tags)
+        effortRecords.append(record)
+        
+        // システムメッセージを送信
+        sendSystemMessage(message: "\(user.name)さんが部屋を作成しました", roomId: newRoom.id)
+        
+        // タイマー開始
+        startTimer()
+        
         saveData()
     }
     
