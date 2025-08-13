@@ -2,6 +2,11 @@ import SwiftUI
 
 // MARK: - 共通関数
 private func getCreatorName(for room: Room, currentUserId: UUID?) -> String {
+    // 現在のユーザーが作成者の場合
+    if let currentUserId = currentUserId, room.createdBy == currentUserId {
+        return "あなた"
+    }
+    
     // 参加者の中から作成者を探す
     if let creator = room.participants.first(where: { $0.id == room.createdBy }) {
         return creator.name

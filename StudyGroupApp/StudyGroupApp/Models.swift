@@ -194,6 +194,7 @@ struct ChatMessage: Identifiable, Codable {
     var roomId: UUID
     var userName: String
     var userProfileImage: String?
+    var customProfileImageData: Data?
     var message: String
     var timestamp: Date
     var messageType: MessageType
@@ -212,11 +213,12 @@ struct ChatMessage: Identifiable, Codable {
         }
     }
     
-    init(userId: UUID, roomId: UUID, userName: String, userProfileImage: String? = nil, message: String, messageType: MessageType = .text) {
+    init(userId: UUID, roomId: UUID, userName: String, userProfileImage: String? = nil, customProfileImageData: Data? = nil, message: String, messageType: MessageType = .text) {
         self.userId = userId
         self.roomId = roomId
         self.userName = userName
         self.userProfileImage = userProfileImage
+        self.customProfileImageData = customProfileImageData
         self.message = message
         self.timestamp = Date()
         self.messageType = messageType

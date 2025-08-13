@@ -67,7 +67,7 @@ struct AddFriendView: View {
                                 showingUserProfile = true
                             }) {
                                 HStack {
-                                    UserAvatar(profileImage: user.profileImage, size: 40)
+                                    UserAvatar(profileImage: user.profileImage, customProfileImageData: user.customProfileImageData, size: 40)
                                     
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(user.name)
@@ -143,7 +143,7 @@ struct UserProfileView: View {
         NavigationView {
             VStack(spacing: 20) {
                 // プロフィール画像
-                UserAvatar(profileImage: user.profileImage, size: 80)
+                UserAvatar(profileImage: user.profileImage, customProfileImageData: user.customProfileImageData, size: 80)
                 
                 // ユーザー情報
                 VStack(spacing: 8) {

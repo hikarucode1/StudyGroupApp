@@ -132,10 +132,10 @@ struct ChatMessageRow: View {
                 }
                 
                 // ユーザーアイコン
-                UserAvatar(profileImage: message.userProfileImage, size: 32)
+                UserAvatar(profileImage: message.userProfileImage, customProfileImageData: message.customProfileImageData, size: 32)
             } else {
                 // ユーザーアイコン
-                UserAvatar(profileImage: message.userProfileImage, size: 32)
+                UserAvatar(profileImage: message.userProfileImage, customProfileImageData: message.customProfileImageData, size: 32)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     if message.messageType == .system {
@@ -185,6 +185,7 @@ struct ChatMessageRow: View {
 // MARK: - ユーザーアバター
 struct UserAvatar: View {
     let profileImage: String?
+    let customProfileImageData: Data?
     let size: CGFloat
     
     var body: some View {
@@ -193,9 +194,18 @@ struct UserAvatar: View {
                 .fill(Color.blue.opacity(0.2))
                 .frame(width: size, height: size)
             
-            Image(systemName: profileImage ?? "person.circle.fill")
-                .font(.system(size: size * 0.6))
-                .foregroundColor(.blue)
+            if let customProfileImageData = customProfileImageData,
+               let customImage = UIImage(data: customProfileImageData) {
+                Image(uiImage: customImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: profileImage ?? "person.circle.fill")
+                    .font(.system(size: size * 0.6))
+                    .foregroundColor(.blue)
+            }
         }
     }
 }

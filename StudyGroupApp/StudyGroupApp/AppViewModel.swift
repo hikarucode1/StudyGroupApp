@@ -292,6 +292,7 @@ class AppViewModel: ObservableObject {
             roomId: roomId,
             userName: user.name,
             userProfileImage: user.profileImage,
+            customProfileImageData: user.customProfileImageData,
             message: message
         )
         

@@ -102,7 +102,7 @@ struct FriendRowView: View {
     
     var body: some View {
         HStack {
-            UserAvatar(profileImage: friend.profileImage, size: 40)
+            UserAvatar(profileImage: friend.profileImage, customProfileImageData: friend.customProfileImageData, size: 40)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(friend.name)
@@ -190,7 +190,7 @@ struct FriendRequestRowView: View {
     
     var body: some View {
         HStack {
-            UserAvatar(profileImage: "person.circle.fill", size: 40)
+            UserAvatar(profileImage: "person.circle.fill", customProfileImageData: nil, size: 40)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("友達リクエスト")

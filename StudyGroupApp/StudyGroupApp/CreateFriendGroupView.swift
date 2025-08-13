@@ -42,7 +42,7 @@ struct CreateFriendGroupView: View {
                     } else {
                         ForEach(viewModel.getFriendsList()) { friend in
                             HStack {
-                                UserAvatar(profileImage: friend.profileImage, size: 32)
+                                UserAvatar(profileImage: friend.profileImage, customProfileImageData: friend.customProfileImageData, size: 32)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(friend.name)
