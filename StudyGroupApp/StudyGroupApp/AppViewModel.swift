@@ -531,6 +531,20 @@ class AppViewModel: ObservableObject {
         print("サンプル部屋データを作成しました")
     }
     
+    // MARK: - ユーザープロフィール管理
+    func updateUserProfile(name: String, bio: String?, goal: String?, profileImage: String?, customProfileImageData: Data?) {
+        guard var user = currentUser else { return }
+        
+        user.name = name
+        user.bio = bio
+        user.goal = goal
+        user.profileImage = profileImage
+        user.customProfileImageData = customProfileImageData
+        
+        currentUser = user
+        saveData()
+    }
+    
     // MARK: - データ管理
     // App Store向けのため、データ操作機能は削除
     // データは自動的に保存・読み込みされる

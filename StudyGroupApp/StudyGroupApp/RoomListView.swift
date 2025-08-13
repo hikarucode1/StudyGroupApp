@@ -275,9 +275,18 @@ struct ParticipantsIconRow: View {
                         .fill(Color.blue.opacity(0.2))
                         .frame(width: 32, height: 32)
                     
-                    Image(systemName: participant.profileImage ?? "person.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.blue)
+                    if let imageData = participant.customProfileImageData,
+                       let customImage = UIImage(data: imageData) {
+                        Image(uiImage: customImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: participant.profileImage ?? "person.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.blue)
+                    }
                 }
                 .overlay(
                     Circle()

@@ -74,6 +74,9 @@ struct User: Identifiable, Codable {
     let id = UUID()
     var name: String
     var profileImage: String? // システムアイコン名
+    var customProfileImageData: Data? // カスタム画像データ
+    var bio: String? // 自己紹介
+    var goal: String? // 目標
     var currentRoom: Room?
     var joinTime: Date?
     
@@ -86,6 +89,9 @@ struct User: Identifiable, Codable {
     init(name: String) {
         self.name = name
         self.profileImage = "person.circle.fill"
+        self.customProfileImageData = nil
+        self.bio = nil
+        self.goal = nil
         self.friends = []
         self.friendRequests = []
         self.isOnline = false

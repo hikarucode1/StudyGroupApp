@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -6,14 +7,10 @@ struct SettingsView: View {
     
     // 通知設定
     @State private var pushNotifications = true
-    @State private var friendActivity = true
-    @State private var roomInvites = true
-    @State private var achievements = true
-    @State private var quietHours = false
-    @State private var quietStartTime = Calendar.current.date(from: DateComponents(hour: 22, minute: 0)) ?? Date()
-    @State private var quietEndTime = Calendar.current.date(from: DateComponents(hour: 7, minute: 0)) ?? Date()
     
+    // 制限アラート管理
     @State private var showingPremiumPurchase = false
+    @State private var showingProfileEdit = false
     
     var body: some View {
         NavigationView {
@@ -44,6 +41,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingPremiumPurchase) {
                 PremiumPurchaseView(premiumManager: viewModel.premiumManager)
+            }
+            .sheet(isPresented: $showingProfileEdit) {
+                UserProfileEditView(viewModel: viewModel)
             }
         }
     }
@@ -94,56 +94,73 @@ struct SettingsView: View {
     }
     
     private var accountSection: some View {
-        Section("ユーザー情報") {
+        Section {
             if let user = viewModel.currentUser {
                 HStack {
-                    Image(systemName: user.profileImage ?? "person.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.blue)
+                    if let imageData = user.customProfileImageData,
+                       let customImage = UIImage(data: imageData) {
+                        Image(uiImage: customImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: user.profileImage ?? "person.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
                     
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(user.name)
                             .font(.headline)
-                        Text("ユーザーID: \(user.id.uuidString.prefix(8))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        
+                        if let bio = user.bio, !bio.isEmpty {
+                            Text(bio)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+                        
+                        if let goal = user.goal, !goal.isEmpty {
+                            Text("🎯 \(goal)")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .lineLimit(1)
+                        }
                     }
                     
                     Spacer()
+                    
+                    Button("編集") {
+                        showingProfileEdit = true
+                    }
+                    .buttonStyle(.bordered)
+                    .font(.caption)
                 }
             }
+        } header: {
+            Text("ユーザー情報")
         }
     }
     
     private var notificationSection: some View {
-        Section("通知設定") {
+        Section {
             Toggle("プッシュ通知", isOn: $pushNotifications)
-            Toggle("友達の活動", isOn: $friendActivity)
-            Toggle("部屋への招待", isOn: $roomInvites)
-            Toggle("達成通知", isOn: $achievements)
-            
-            Toggle("静寂時間を設定", isOn: $quietHours)
-            
-            if quietHours {
-                HStack {
-                    Text("開始時間")
-                    Spacer()
-                    DatePicker("", selection: $quietStartTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
+                .onChange(of: pushNotifications) { newValue in
+                    // 通知の許可状態を更新
+                    if newValue {
+                        requestNotificationPermission()
+                    }
                 }
-                
-                HStack {
-                    Text("終了時間")
-                    Spacer()
-                    DatePicker("", selection: $quietEndTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                }
-            }
+        } header: {
+            Text("通知設定")
+        } footer: {
+            Text("プッシュ通知をオンにすると、部屋への招待や友達の活動をお知らせします。")
         }
     }
     
     private var dataSection: some View {
-        Section("統計サマリー") {
+        Section {
             HStack {
                 Image(systemName: "house.fill")
                     .foregroundColor(.blue)
@@ -170,44 +187,25 @@ struct SettingsView: View {
                 Text("\(viewModel.effortRecords.count)回")
                     .foregroundColor(.secondary)
             }
+        } header: {
+            Text("統計サマリー")
         }
     }
     
     private var appInfoSection: some View {
         Group {
-            Section("アプリ情報") {
+            Section {
                 HStack {
                     Text("バージョン")
                     Spacer()
                     Text("1.0.0")
                         .foregroundColor(.secondary)
                 }
-                
-                HStack {
-                    Text("ビルド")
-                    Spacer()
-                    Text("1")
-                        .foregroundColor(.secondary)
-                }
+            } header: {
+                Text("アプリ情報")
             }
             
-            Section("開発者情報") {
-                HStack {
-                    Text("開発者")
-                    Spacer()
-                    Text("渡邊光")
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack {
-                    Text("作成日")
-                    Spacer()
-                    Text("2025年8月")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Section("サポート") {
+            Section {
                 Button(action: {
                     // プライバシーポリシーを表示
                 }) {
@@ -237,6 +235,8 @@ struct SettingsView: View {
                         Text("お問い合わせ")
                     }
                 }
+            } header: {
+                Text("サポート")
             }
         }
     }
@@ -250,6 +250,18 @@ struct SettingsView: View {
             return "\(hours)時間\(minutes)分"
         } else {
             return "\(minutes)分"
+        }
+    }
+    
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    self.pushNotifications = true
+                } else {
+                    self.pushNotifications = false
+                }
+            }
         }
     }
 }
