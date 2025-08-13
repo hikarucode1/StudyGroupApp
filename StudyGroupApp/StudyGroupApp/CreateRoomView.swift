@@ -16,6 +16,9 @@ struct CreateRoomView: View {
     @State private var password = ""
     @State private var maxParticipants = 10
     
+    // 制限アラート管理
+    @State private var showingLimitAlert = false
+    
     var body: some View {
         NavigationView {
             Form {
@@ -203,6 +206,24 @@ struct CreateRoomView: View {
                 }
             }
         }
+        .alert("部屋作成制限に達しました", isPresented: $showingLimitAlert) {
+            Button("OK", role: .cancel) {
+                // ユーザーがOKを押したときの処理
+            }
+        } message: {
+            Text("月間の部屋作成制限（5部屋）に達しました。プレミアム版にアップグレードすると、無制限に部屋を作成できます。")
+        }
+        .sheet(isPresented: $showingLimitAlert) {
+            LimitAlertView(
+                feature: "部屋作成",
+                currentLimit: FeatureLimits.freeRoomCreationLimit,
+                limitType: "月間",
+                onDismiss: {
+                    showingLimitAlert = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
     }
     
     private func addTag() {
@@ -231,8 +252,14 @@ struct CreateRoomView: View {
     }
     
     private func createRoom() {
+        // 部屋作成制限をチェック
+        if !viewModel.featureLimiter.canCreateRoom() {
+            showingLimitAlert = true
+            return
+        }
+        
         let finalPassword = isPrivate && !password.isEmpty ? password : nil
-        viewModel.createRoom(
+        let success = viewModel.createRoom(
             name: roomName,
             tags: tags,
             isPrivate: isPrivate,
@@ -240,7 +267,10 @@ struct CreateRoomView: View {
             password: finalPassword,
             maxParticipants: maxParticipants
         )
-        dismiss()
+        
+        if success {
+            dismiss()
+        }
     }
     
     // よく使われるタグの候補（予測変換用）

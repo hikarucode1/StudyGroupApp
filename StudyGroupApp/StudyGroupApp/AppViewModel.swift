@@ -6,15 +6,22 @@ import UserNotifications
 class AppViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var rooms: [Room] = []
-    @Published var effortRecords: [EffortRecord] = []
-    @Published var notifications: [Notification] = []
-    @Published var chatMessages: [ChatMessage] = []
-    @Published var friendRequests: [FriendRequest] = []
-    @Published var friendGroups: [FriendGroup] = []
     @Published var currentRoom: Room?
     @Published var roomStartTime: Date?
+    @Published var effortRecords: [EffortRecord] = []
+    @Published var notifications: [Notification] = []
+    @Published var friendRequests: [FriendRequest] = []
+    @Published var friendGroups: [FriendGroup] = []
+    @Published var chatMessages: [ChatMessage] = []
+    
+    // 機能制限管理を追加
+    @Published var featureLimiter = FeatureLimiter()
+    
+    // プレミアム管理を追加
+    @Published var premiumManager = PremiumManager()
     
     private var timer: Timer?
+    private let userDefaults = UserDefaults.standard
     
     // UserDefaultsのキー
     private enum Keys {
@@ -28,13 +35,17 @@ class AppViewModel: ObservableObject {
     }
     
     init() {
-        setupNotifications()
         loadData()
     }
     
     // MARK: - 部屋管理
-    func createRoom(name: String, tags: [String], isPrivate: Bool = false, isInviteOnly: Bool = false, password: String? = nil, maxParticipants: Int = 10) {
-        guard let user = currentUser else { return }
+    func createRoom(name: String, tags: [String], isPrivate: Bool = false, isInviteOnly: Bool = false, password: String? = nil, maxParticipants: Int = 10) -> Bool {
+        guard let user = currentUser else { return false }
+        
+        // プレミアム版でない場合のみ部屋作成制限をチェック
+        if !premiumManager.isPremium && !featureLimiter.canCreateRoom() {
+            return false
+        }
         
         var newRoom = Room(
             name: name,
@@ -51,6 +62,11 @@ class AppViewModel: ObservableObject {
         
         rooms.append(newRoom)
         
+        // プレミアム版でない場合のみ部屋作成カウントを増加
+        if !premiumManager.isPremium {
+            featureLimiter.incrementRoomCount()
+        }
+        
         // 作成者を自動的に部屋に参加させる
         currentRoom = newRoom
         roomStartTime = Date()
@@ -66,6 +82,7 @@ class AppViewModel: ObservableObject {
         startTimer()
         
         saveData()
+        return true
     }
     
     func joinRoom(_ room: Room, password: String? = nil) -> Bool {
@@ -309,14 +326,26 @@ class AppViewModel: ObservableObject {
     
     // MARK: - 友達機能
     func sendFriendRequest(to userId: UUID, message: String? = nil) -> Bool {
-        guard let currentUser = currentUser,
-              userId != currentUser.id,
-              !friendRequests.contains(where: { 
-                  $0.fromUserId == currentUser.id && $0.toUserId == userId && $0.status == .pending 
-              }) else { return false }
+        guard let currentUser = currentUser else { return false }
+        
+        // プレミアム版でない場合のみ友達数制限をチェック
+        if !premiumManager.isPremium && !featureLimiter.canAddFriend() {
+            return false
+        }
+        
+        // 既に友達リクエストが存在するかチェック
+        if friendRequests.contains(where: { $0.fromUserId == currentUser.id && $0.toUserId == userId }) {
+            return false
+        }
         
         let request = FriendRequest(fromUserId: currentUser.id, toUserId: userId, message: message)
         friendRequests.append(request)
+        
+        // プレミアム版でない場合のみ友達数カウントを増加
+        if !premiumManager.isPremium {
+            featureLimiter.incrementFriendCount()
+        }
+        
         saveData()
         return true
     }
